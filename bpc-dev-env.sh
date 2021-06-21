@@ -11,12 +11,6 @@ source bpc/bin/activate
 pip install -r bpc-requirements.txt
 python -m ipykernel install --user --name=bpc
 
-# Check out the latest Nilearn sources:
-git clone https://github.com/nilearn/nilearn.git
-
-# Navigate to your cloned Nilearn base directory and install:
-pip install -e ./nilearn
-
 deactivate
 
 #echo "to remove enviroment run 'rm -rf bpc'"
