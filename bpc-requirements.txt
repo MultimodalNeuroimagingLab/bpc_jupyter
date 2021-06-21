@@ -1,0 +1,21 @@
+# Requirements for the demo notebooks
+
+numpy
+pandas
+scipy
+sklearn
+matplotlib
+
+pybids
+nibabel
+# nilearn 0.7.2 is still under development.
+# To install:
+# Check out the latest Nilearn sources:
+# git clone https://github.com/nilearn/nilearn.git
+# Navigate to your cloned Nilearn base directory and install:
+# pip install -e ./nilearn
+
+pymef
+
+tqdm
+ipykernel
