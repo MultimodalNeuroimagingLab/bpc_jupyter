@@ -2,7 +2,7 @@
 .DS_store
 
 # Folder where we get packages
-pbc/*
+bpc/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
