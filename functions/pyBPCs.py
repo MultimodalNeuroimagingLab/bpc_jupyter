@@ -116,7 +116,7 @@ def nativeNormalized(pair_types, P):
                     b.extend(a[q, q+1:])
                 # for q=2:(size(a,2)), b=[b a(q,1:(q-1))]; end
                 for q in range(1, a.shape[1]):
-                    b.extend(a[q, :q-1])
+                    b.extend(a[q, :q])
             else:
                 # b=reshape(P(pair_types(k).indices,pair_types(l).indices),1,[]);
                 b = P[np.ix_(pair_types['indices'][k],
@@ -209,7 +209,7 @@ def projectionWeights(B_struct):
     return B_struct
 
 def kpca(X):
-    
+
     F,S,_=np.linalg.svd(X.T)  # Compute the eigenvalues and right eigenvectors.
     ES = X @ F # kernel trick
     E = ES / (np.ones((X.shape[0],1)) @ S[np.newaxis]) # divide through to obtain unit-normalized eigenvectors
