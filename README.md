@@ -6,7 +6,7 @@ This jupyter notebook was written by Tal Pal Attia, Harvey Huang and Dora Hermes
 
 ## Preparations
 
-There fore two steps to prepare for the tutorial:
+There are two steps to prepare for the tutorial:
 
 1. Download this example dataset from OpenNeuro: https://openneuro.org/datasets/ds003708
 
