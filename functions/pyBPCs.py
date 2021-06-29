@@ -49,7 +49,7 @@ def ccep_CAR64blocks(df_data_in, ttt, good_channels):
     good_channels_resp_var = df_data_in[df_data_in['channel'].isin(
         good_channels['name'])]['response_var']
     # chan_var OR resp_var???
-    resp_th = helper.quantile(good_channels_var, 0.95)
+    resp_th = helper.quantile(good_channels_var, 0.75)
 
     # these are the channels that are ok to include in the CAR for this
     # stimulation pair (should exclude stim pair, but not explicitly):
@@ -65,6 +65,9 @@ def ccep_CAR64blocks(df_data_in, ttt, good_channels):
     df_data_chans_incl = df_data_in[df_data_in.index.isin(
         df_chans_incl.index.to_list())]
 
+    car = df_data_chans_incl['data'].values.mean() # common average reference across all channels
+
+    """
     # calc good channels mean per group
     car_sets = np.empty(len(df_data_in.groupNum.unique()), dtype=object)
 
@@ -72,11 +75,12 @@ def ccep_CAR64blocks(df_data_in, ttt, good_channels):
         i = int(ind)
         car_sets[i] = (
             df_data_chans_incl[df_data_chans_incl['groupNum'] == i]['data'].values.mean())
+    """
 
-    # substract group mean from group channels
+    # substract CAR from each channel
     for idx, row in df_data_in.iterrows():
-        groupmean = car_sets[row['groupNum']]
-        df_data_in['data'].loc[idx] = row['data']-groupmean
+        #groupmean = car_sets[row['groupNum']]
+        df_data_in['data'].loc[idx] = row['data'] - car
 
     return df_data_in
 
