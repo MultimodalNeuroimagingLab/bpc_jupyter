@@ -33,7 +33,7 @@ def ccep_CAR64blocks(df_data_in, ttt, good_channels):
     good_channels_var = df_data_in[df_data_in['channel'].isin(
         good_channels['name'])]['channel_var']
 
-    var_th = helper.quantile(good_channels_var, 0.95)  # costum function
+    var_th = helper.quantile(good_channels_var, 0.75)  # costum function
 
     # set a threshold for which channels to reject based on response period
     # The result is a tuple with first all the row indices, then all the column indices.
@@ -49,7 +49,7 @@ def ccep_CAR64blocks(df_data_in, ttt, good_channels):
     good_channels_resp_var = df_data_in[df_data_in['channel'].isin(
         good_channels['name'])]['response_var']
     # chan_var OR resp_var???
-    resp_th = helper.quantile(good_channels_var, 0.75)
+    resp_th = helper.quantile(good_channels_var, 0.95)
 
     # these are the channels that are ok to include in the CAR for this
     # stimulation pair (should exclude stim pair, but not explicitly):
