@@ -1,8 +1,12 @@
 # bpc_jupyter
 
-This Jupyter notebook calculates Basis Profile Curve for intracranial EEG data during single pulse stimulation as described in Miller, Mueller and Hermes (2021) https://doi.org/10.1101/2021.01.24.428020
+This Jupyter notebook is a tutorial for how to calculate Basis Profile Curve for intracranial EEG data during single pulse stimulation as described in: 
 
-This jupyter notebook was written by Tal Pal Attia, Harvey Huang and Dora Hermes, 2021. 
+Miller KJ, Müller K-R, Hermes D (2021) Basis profile curve identification to understand electrical stimulation effects in human brain networks. PLoS Comput Biol 17(9): e1008710. https://doi.org/10.1371/journal.pcbi.1008710
+
+Please cite this work when using the code. 
+
+This Jupyter notebook is a translation of the Matlab code developed used for this publication and was written by Tal Pal Attia, Harvey Huang and Dora Hermes, 2021. 
 
 ## Preparations
 
