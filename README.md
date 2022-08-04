@@ -6,7 +6,7 @@ Miller KJ, Müller K-R, Hermes D (2021) Basis profile curve identification to un
 
 Please cite this work when using the code. 
 
-This Jupyter notebook is a translation of the Matlab code developed used for this publication and was written by Tal Pal Attia, Harvey Huang and Dora Hermes, 2021. 
+This Jupyter notebook is a translation of the Matlab code that was developed by Kai Miller in the paper. The Jupyter notebook was written by Tal Pal Attia, Harvey Huang and Dora Hermes, 2021. 
 
 ## Preparations
 
