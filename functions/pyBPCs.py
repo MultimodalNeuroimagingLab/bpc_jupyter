@@ -19,7 +19,7 @@ def ccep_CAR64blocks(df_data_in, ttt, good_channels):
     # which channels have lots of noise:
     #   Set a threshold for which channels to reject based on variance
     #   The result is a tuple with first all the row indices, then all the column indices.
-    start_th = np.where(ttt == helper.find_nearest(ttt, .500))[0][0]+1
+    start_th = np.where(ttt == helper.find_nearest(ttt, .500))[0][0] + 1
     end_th = np.where(ttt == helper.find_nearest(ttt, 2))[0][0]  # The result is a tuple with first all the row indices, then all the column indices.\
 
     data_var = signaldata[:, start_th:end_th]
@@ -71,7 +71,7 @@ def ccep_CAR64blocks(df_data_in, ttt, good_channels):
             df_data_chans_incl[df_data_chans_incl['groupNum'] == i]['data'].values.mean())
     """
 
-    # substract CAR from each channel
+    # subtract CAR from each channel
     for idx, row in df_data_in.iterrows():
         #groupmean = car_sets[row['groupNum']]
         df_data_in.at[idx, 'data'] -= car
@@ -115,6 +115,9 @@ def nativeNormalized(pair_types, P):
                 # for q=2:(size(a,2)), b=[b a(q,1:(q-1))]; end
                 for q in range(1, a.shape[1]):
                     b.extend(a[q, :q])
+
+                #b = np.asarray(b)
+
             else:
                 # b=reshape(P(pair_types(k).indices,pair_types(l).indices),1,[]);
                 b = P[np.ix_(pair_types['indices'][k],
@@ -126,10 +129,10 @@ def nativeNormalized(pair_types, P):
             b_std = np.std(b, ddof=1)
             b_sqrt_n = np.sqrt(len(b))
 
-            t = b_mean/(b_std/b_sqrt_n)  # calculate t-statistic
+            t = b_mean / (b_std / b_sqrt_n)  # calculate t-statistic
             tmat.append(t)
 
-    S = np.array(S).reshape(-1, n)
+    #S = np.array(S).reshape(-1, n)
     tmat = np.array(tmat).reshape(-1, n)
 
     return tmat
