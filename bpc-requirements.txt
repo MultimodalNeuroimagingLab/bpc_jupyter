@@ -1,8 +1,8 @@
 # Requirements for the demo notebooks
 
-numpy
-pandas
-scipy
+numpy >= 1.24.4
+pandas >= 2.0.3
+scipy >= 1.10.1
 sklearn
 matplotlib
 
@@ -10,7 +10,7 @@ pybids
 nibabel
 nilearn
 
-pymef
+pymef >= 1.3.6
 
 tqdm
 ipykernel

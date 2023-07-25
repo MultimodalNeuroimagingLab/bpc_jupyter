@@ -7,7 +7,7 @@ import functions.helperFunctions as helper
 
 def create_time_vector(epoch_limits, srate):
     tt = np.arange(start=epoch_limits[0],
-                   stop=epoch_limits[1]+1/srate, step=1/srate)
+                   stop=epoch_limits[1] + 1/srate, step=1/srate)
     tt = np.delete(tt, 0)
     return tt
 
@@ -19,9 +19,8 @@ def ccep_CAR64blocks(df_data_in, ttt, good_channels):
     # which channels have lots of noise:
     #   Set a threshold for which channels to reject based on variance
     #   The result is a tuple with first all the row indices, then all the column indices.
-    start_th = np.where(ttt == helper.find_nearest(ttt, .500))[0][0]+1
-    end_th = np.where(ttt == helper.find_nearest(ttt, 2))[
-        0][0]  # The result is a tuple with first all the row indices, then all the column indices.\
+    start_th = np.where(ttt == helper.find_nearest(ttt, .500))[0][0] + 1
+    end_th = np.where(ttt == helper.find_nearest(ttt, 2))[0][0]  # The result is a tuple with first all the row indices, then all the column indices.\
 
     data_var = signaldata[:, start_th:end_th]
 
@@ -30,14 +29,13 @@ def ccep_CAR64blocks(df_data_in, ttt, good_channels):
     chan_var = np.var(data_var, axis=1, ddof=1)
     df_data_in.insert(2, "channel_var", chan_var, True)
 
-    good_channels_var = df_data_in[df_data_in['channel'].isin(
-        good_channels['name'])]['channel_var']
+    good_channels_var = df_data_in[df_data_in['channel'].isin(good_channels['name'])]['channel_var']
 
     var_th = helper.quantile(good_channels_var, 0.75)  # costum function
 
     # set a threshold for which channels to reject based on response period
     # The result is a tuple with first all the row indices, then all the column indices.
-    resp_start = np.where(ttt == helper.find_nearest(ttt, .010))[0][0]+1
+    resp_start = np.where(ttt == helper.find_nearest(ttt, .010))[0][0] + 1
     # The result is a tuple with first all the row indices, then all the column indices.
     resp_end = np.where(ttt == helper.find_nearest(ttt, .100))[0][0]
 
@@ -46,24 +44,20 @@ def ccep_CAR64blocks(df_data_in, ttt, good_channels):
     resp_var = np.var(resp_data, axis=1, ddof=1)
     df_data_in.insert(3, "response_var", resp_var, True)
 
-    good_channels_resp_var = df_data_in[df_data_in['channel'].isin(
-        good_channels['name'])]['response_var']
+    good_channels_resp_var = df_data_in[df_data_in['channel'].isin(good_channels['name'])]['response_var']
     # chan_var OR resp_var???
     resp_th = helper.quantile(good_channels_var, 0.75)
 
     # these are the channels that are ok to include in the CAR for this
     # stimulation pair (should exclude stim pair, but not explicitly):
-    curr_indexes_chan_var = good_channels_var[(
-        good_channels_var > var_th)].index  # Get indexes
+    curr_indexes_chan_var = good_channels_var[(good_channels_var > var_th)].index  # Get indexes
+
     # also exclude channels with a larger response
-    curr_indexes_resp_vars = good_channels_resp_var[(
-        good_channels_resp_var > resp_th)].index  # Get indexes
-    df_chans_incl = good_channels[~good_channels.index.isin(curr_indexes_resp_vars.union(
-        curr_indexes_chan_var))]  # Delete these row indexes from dataFrame
+    curr_indexes_resp_vars = good_channels_resp_var[(good_channels_resp_var > resp_th)].index  # Get indexes
+    df_chans_incl = good_channels[~good_channels.index.isin(curr_indexes_resp_vars.union(curr_indexes_chan_var))]  # Delete these row indexes from dataFrame
 
     # we split the original channels into 64 channel blocks and take the mean of each group of good channels
-    df_data_chans_incl = df_data_in[df_data_in.index.isin(
-        df_chans_incl.index.to_list())]
+    df_data_chans_incl = df_data_in[df_data_in.index.isin(df_chans_incl.index.to_list())]
 
     car = df_data_chans_incl['data'].values.mean() # common average reference across all channels
 
@@ -77,10 +71,10 @@ def ccep_CAR64blocks(df_data_in, ttt, good_channels):
             df_data_chans_incl[df_data_chans_incl['groupNum'] == i]['data'].values.mean())
     """
 
-    # substract CAR from each channel
+    # subtract CAR from each channel
     for idx, row in df_data_in.iterrows():
         #groupmean = car_sets[row['groupNum']]
-        df_data_in['data'].loc[idx] = row['data'] - car
+        df_data_in.at[idx, 'data'] -= car
 
     return df_data_in
 
@@ -121,6 +115,9 @@ def nativeNormalized(pair_types, P):
                 # for q=2:(size(a,2)), b=[b a(q,1:(q-1))]; end
                 for q in range(1, a.shape[1]):
                     b.extend(a[q, :q])
+
+                #b = np.asarray(b)
+
             else:
                 # b=reshape(P(pair_types(k).indices,pair_types(l).indices),1,[]);
                 b = P[np.ix_(pair_types['indices'][k],
@@ -132,10 +129,10 @@ def nativeNormalized(pair_types, P):
             b_std = np.std(b, ddof=1)
             b_sqrt_n = np.sqrt(len(b))
 
-            t = b_mean/(b_std/b_sqrt_n)  # calculate t-statistic
+            t = b_mean / (b_std / b_sqrt_n)  # calculate t-statistic
             tmat.append(t)
 
-    S = np.array(S).reshape(-1, n)
+    #S = np.array(S).reshape(-1, n)
     tmat = np.array(tmat).reshape(-1, n)
 
     return tmat
