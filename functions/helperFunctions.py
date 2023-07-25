@@ -1,6 +1,4 @@
 # imports
-from pandas.core.common import SettingWithCopyWarning
-import warnings
 import numpy as np
 
 
@@ -23,19 +21,11 @@ def find_nearest(array, value):
 def quantile(x, q):
     n = len(x)
     y = np.sort(x)
-    return(np.interp(q, np.linspace(1/(2*n), (2*n-1)/(2*n), n), y))
+    return(np.interp(q, np.linspace(1 / (2 * n), (2 * n - 1) / (2 * n), n), y))
 
 
 # https://gist.github.com/fasiha/eff0763ca25777ec849ffead370dc907
 # In Python and Matplotlib, an image like this is a little harder to obtain, because by default, Matplotlib’s imshow forces square pixels.
 def extents(f):
     delta = f[1] - f[0]
-    return [f[0] - delta/2, f[-1] + delta/2]
-
-
-# ignore pandas/core/indexing.py:1637: SettingWithCopyWarning: A value is trying to be set on a copy of a slice from a DataFrame
-warnings.simplefilter(action = "ignore", category = SettingWithCopyWarning)
-
-# ignore numpy VisibleDeprecationWarning
-warnings.filterwarnings(action = "ignore", category = np.VisibleDeprecationWarning) 
-
+    return [f[0] - delta / 2, f[-1] + delta / 2]
