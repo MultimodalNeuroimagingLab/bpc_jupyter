@@ -169,7 +169,7 @@ V = epochs.get_data(tmin=bpc_tmin, tmax=bpc_tmax)[:, 0]  # select only channel
 V0 = V / np.linalg.norm(V, axis=0)  # L2 norm each trial
 P = V0 @ V.T  # calculate internal projections
 
-pairs = sorted(np.unique(epochs.metadata.electrical_stimulation_site))
+pairs = np.array(sorted(np.unique(epochs.metadata.electrical_stimulation_site)))
 tmat = np.zeros((len(pairs), len(pairs)))
 for i, pair1 in enumerate(pairs):
     mask = epochs.metadata.electrical_stimulation_site == pair1
@@ -398,7 +398,7 @@ def bpcs(V, stim_sites, cluster_dim=10, n_reruns=20, tol=1e-5,
     V0 = V / np.linalg.norm(V, axis=0)  # L2 norm each trial
     P = V0 @ V.T  # calculate internal projections
 
-    pairs = np.unique(stim_sites)
+    pairs = np.array(sorted(np.unique(stim_sites)))
     tmat = np.zeros((len(pairs), len(pairs)))
     for i, pair1 in enumerate(pairs):
         mask = stim_sites == pair1
@@ -431,8 +431,13 @@ def bpcs(V, stim_sites, cluster_dim=10, n_reruns=20, tol=1e-5,
         if nmf_penalty <= 1:
             break
 
-    H0_ = np.max(H, axis=1)
-    H0_ = H0_[H0_ < 1 / (2 * np.sqrt(pairs.size))] = 0
+    # find significant pairs per BPC; must be > threshold and greater than other BPCs
+    for bpc_idx in range(H.shape[0]):
+        bpc_pair_idxs = np.where((H[bpc_idx] == np.max(H, axis=0)) &
+                                 (H[bpc_idx] > 1 / (2 * np.sqrt(len(pairs)))))[0]
+        bpc_trials = np.concatenate([np.where(stim_sites == pairs[bpc_pair_idx])[0]
+                                     for bpc_pair_idx in bpc_pair_idxs])
+        B = kpca(V[bpc_trials])
     return tmat
 
 
