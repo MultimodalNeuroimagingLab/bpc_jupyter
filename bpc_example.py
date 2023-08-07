@@ -23,24 +23,13 @@ import openneuro
 import mne
 import mne_bids
 
-import os
-import numpy as np
 import pandas as pd
-from scipy import signal
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from sklearn.decomposition import NMF
-import itertools
-from tqdm import tqdm
-
-import bids
-from pymef.mef_session import MefSession
-from nilearn import plotting
-
-import functions.helperFunctions as helper
-import functions.pyBPCs as pyBPCs
 
 """
+import os
 # conversion
 dataset = 'ds003708'
 root = Path('..') / dataset
@@ -134,13 +123,14 @@ trans = mne.transforms.Transform(fro='head', to='mri', trans=np.eye(4))  # ident
 fig = mne.viz.plot_alignment(
     raw.info, trans=trans, subject='fsaverage', surfaces='pial')
 mne.viz.set_3d_view(fig, azimuth=150)
+
 xy, im = mne.viz.snapshot_brain_montage(fig, raw.info)
 fig, ax = plt.subplots()
 ax.axis('off')
 ax.imshow(im)
 for name, pos in xy.items():
-    ax.text(*pos, name, ha='center', va='center', fontsize=4)
-fig.show()
+    if pos[0] >= 0 and pos[1] >= 0:  # no NaN locations
+        ax.text(*pos, name, ha='center', va='center', fontsize=4)
 
 events, event_id = mne.events_from_annotations(raw)
 mne.viz.plot_events(events, raw.info['sfreq'], event_id=event_id)
@@ -179,22 +169,22 @@ V = epochs.get_data(tmin=bpc_tmin, tmax=bpc_tmax)[:, 0]  # select only channel
 V0 = V / np.linalg.norm(V, axis=0)  # L2 norm each trial
 P = V0 @ V.T  # calculate internal projections
 
-pairs = np.unique(epochs.metadata.electrical_stimulation_site)
+pairs = sorted(np.unique(epochs.metadata.electrical_stimulation_site))
 tmat = np.zeros((len(pairs), len(pairs)))
 for i, pair1 in enumerate(pairs):
     mask = epochs.metadata.electrical_stimulation_site == pair1
     b = P[np.ix_(mask, mask)].ravel()
-    tmat[i, i] = np.mean(b) / np.std(b, ddof=1) / np.sqrt(len(b))
+    tmat[i, i] = np.mean(b) * np.sqrt(len(b)) / np.std(b, ddof=1)
     for j, pair2 in enumerate(pairs[i + 1:]):
         b = P[np.ix_(epochs.metadata.electrical_stimulation_site == pair1,
                      epochs.metadata.electrical_stimulation_site == pair2)].ravel()
-        tmat[i + j + 1, i] = np.mean(b) / np.std(b, ddof=1) / np.sqrt(len(b))
+        tmat[i + j + 1, i] = np.mean(b) * np.sqrt(len(b)) / np.std(b, ddof=1)
 
 # copy to lower
 tmat = tmat + tmat.T - np.diag(np.diag(tmat))
 
 fig, ax = plt.subplots()
-im = ax.imshow(tmat, vmin=0, vmax=0.1)
+im = ax.imshow(tmat, vmin=0, vmax=10)
 ax.set_xticks(range(tmat.shape[0]))
 ax.set_xticklabels(pairs, rotation=90, fontsize=6)
 ax.set_xlabel('Stimulation Pair')
@@ -413,10 +403,10 @@ def bpcs(V, stim_sites, cluster_dim=10, n_reruns=20, tol=1e-5,
     for i, pair1 in enumerate(pairs):
         mask = stim_sites == pair1
         b = P[np.ix_(mask, mask)].ravel()
-        tmat[i, i] = np.mean(b) / np.std(b, ddof=1) / np.sqrt(len(b))
+        tmat[i, i] = np.mean(b) * np.sqrt(len(b)) / np.std(b, ddof=1)
         for j, pair2 in enumerate(pairs[i + 1:]):
             b = P[np.ix_(stim_sites == pair1, stim_sites == pair2)].ravel()
-            tmat[i + j + 1, i] = np.mean(b) / np.std(b, ddof=1) / np.sqrt(len(b))
+            tmat[i + j + 1, i] = np.mean(b) * np.sqrt(len(b)) / np.std(b, ddof=1)
 
     # copy to lower
     tmat = tmat + tmat.T - np.diag(np.diag(tmat))
@@ -441,7 +431,8 @@ def bpcs(V, stim_sites, cluster_dim=10, n_reruns=20, tol=1e-5,
         if nmf_penalty <= 1:
             break
 
-    H0_ = H > 1 / (2 * np.sqrt(pairs.size))
+    H0_ = np.max(H, axis=1)
+    H0_ = H0_[H0_ < 1 / (2 * np.sqrt(pairs.size))] = 0
     return tmat
 
 
