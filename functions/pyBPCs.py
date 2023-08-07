@@ -55,7 +55,7 @@ def ccep_CAR64blocks(df_data_in, ttt, good_channels):
     # also exclude channels with a larger response
     curr_indexes_resp_vars = good_channels_resp_var[(good_channels_resp_var > resp_th)].index  # Get indexes
     df_chans_incl = good_channels[~good_channels.index.isin(curr_indexes_resp_vars.union(curr_indexes_chan_var))]  # Delete these row indexes from dataFrame
-
+    
     # we split the original channels into 64 channel blocks and take the mean of each group of good channels
     df_data_chans_incl = df_data_in[df_data_in.index.isin(df_chans_incl.index.to_list())]
 
