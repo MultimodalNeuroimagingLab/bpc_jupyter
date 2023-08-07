@@ -9,6 +9,8 @@ matplotlib
 pybids
 nibabel
 nilearn
+mne
+mne_bids
 
 pymef == 1.3.4
 
