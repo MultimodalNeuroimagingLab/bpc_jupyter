@@ -437,7 +437,9 @@ def bpcs(V, stim_sites, cluster_dim=10, n_reruns=20, tol=1e-5,
                                  (H[bpc_idx] > 1 / (2 * np.sqrt(len(pairs)))))[0]
         bpc_trials = np.concatenate([np.where(stim_sites == pairs[bpc_pair_idx])[0]
                                      for bpc_pair_idx in bpc_pair_idxs])
-        B = kpca(V[bpc_trials])
+        B = kpca(V[bpc_trials])[:, 0]  # basis vector is 1st PC
+        if np.mean(B.T @ V[bpc_trials]) < 0:
+            B *= -1  # sign flip
     return tmat
 
 
