@@ -134,7 +134,7 @@ for name, pos in xy.items():
         ax.text(*pos, name, ha='center', va='center', fontsize=4)
 
 events, event_id = mne.events_from_annotations(raw)
-mne.viz.plot_events(events, raw.info['sfreq'], event_id=event_id)
+mne.viz.plot_events(events, raw.info['sfreq'], event_id=event_id, show=False)
 
 # %%
 # Create epochs around stimulation, visualize data.
@@ -144,11 +144,15 @@ bl_tmin, bl_tmax = -0.5, -0.05
 
 # try ``baseline=None`` for no baseline correction to play around
 metadata = pd.read_csv(path.update(suffix='events'), sep='\t')
-epochs = mne.Epochs(raw, events, event_id=event_id, tmin=tmin, tmax=tmax,
+keep = metadata.trial_type == 'electrical_stimulation'
+if 'status' in metadata:
+    keep = keep & metadata.status == 'good'
+metadata = metadata[keep]
+epochs = mne.Epochs(raw, events[keep],
+                    tmin=tmin, tmax=tmax,
                     baseline=(bl_tmin, bl_tmax), picks=[contact],
                     preload=True)
 epochs.metadata = metadata  # contains stimulation location information
-epochs = epochs[metadata.status == 'good']
 
 # unpack each pair separated by a hyphen, only use trials where
 # stimulation was delivered to channels other than the channel of
@@ -199,6 +203,7 @@ fig.show()
 
 t0 = tmat.copy()
 t0[t0 < 0] = 0
+t0[np.isnan(t0)] = 0
 t0 /= (np.max(t0))
 
 cluster_dim = 9
@@ -243,6 +248,7 @@ for bpc_idx in range(n_components):  # loop over BPCs
     Bs[bpc_idx] = kpca(V[bpc_trials].T)[:, 0]  # basis vector is 1st PC
     if np.mean(Bs[bpc_idx] @ V[bpc_trials].T) < 0:
         Bs[bpc_idx] *= -1  # sign flip
+    print(bpc_idx, bpc_pair_idxs)
 excluded_pairs = pairs[np.isnan(bpc_pairs)]
 
 # %%
@@ -315,7 +321,7 @@ for i, name in enumerate(pairs):
     if pos[0] < 0 or pos[0] > im.shape[0] or pos[1] < 0 or pos[1] > im.shape[1]:
         continue
     color = colors[int(bpc_pairs[i])]
-    size = int(abs(plotweights[i] * 200))
+    size = plotweights[i] * 200
     ax.scatter(*pos, color=color[:3], s=[size], alpha=0.75)
 fig.show()
 
