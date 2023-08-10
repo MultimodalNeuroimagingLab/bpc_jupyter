@@ -10,7 +10,7 @@ pybids
 nibabel
 nilearn
 
-pymef == 1.3.4
+ieegprep >= 1.4.1
 
 tqdm
 ipykernel
