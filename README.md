@@ -6,15 +6,30 @@ Miller KJ, Müller K-R, Hermes D (2021) Basis profile curve identification to un
 
 Please cite this work when using the code. 
 
-This Jupyter notebook is a translation of the Matlab code that was developed by Kai Miller in the paper. The Jupyter notebook was written by Tal Pal Attia, Harvey Huang and Dora Hermes, 2021. 
+This Jupyter notebook is a translation of the Matlab code that was developed by Kai Miller in the paper. The Jupyter notebook working with MEF3 data was written by Tal Pal Attia, Harvey Huang and Dora Hermes, 2021. The Jupyter notebook working with Brainvision data was written by Alex Rockhill and Dora Hermes, 2023. 
 
-## Preparations
+## Data preparations
+Download this example dataset from OpenNeuro: https://openneuro.org/datasets/ds003708
 
-There are two steps to prepare for the tutorial:
+## Python packages
+### Working with raw MEF3 data (out of date)
+`bpc_interactive.ipynb`
+Set up the environment and add the required python packages by opening the jupiter notebook (bpc_interactive.ipynb) and completing **Section 1, Getting started with the Python environment and packages** 
 
-1. Download this example dataset from OpenNeuro: https://openneuro.org/datasets/ds003708
-
-2. Set up the environment and add the required python packages by opening the jupiter notebook (bpc_interactive.ipynb) and completing **Section 1, Getting started with the Python environment and packages** 
+### Working with preprocessed Brainvision data
+`bpc_interactive_mne.ipynb` 
+Data in the /derivatives/preprocessed repository have been referenced to an adjusted common average. This simplifies the code and process, and you can use mne python to work with these Brainvision data. Code depends on the following Python packages:
+- MNE
+- MNE-BIDS
+- openneuro-py
+- numpy (version>=1.24.4)
+- pandas (version>=2.0.3)
+- scipy (version>=1.10.1)
+- sklearn
+- matplotlib
+- tqdm
+- ipykernel
+- nilearn
 
 
 
