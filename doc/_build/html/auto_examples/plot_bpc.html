@@ -1,0 +1,546 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+    <title>Basis Profile Curve (BPC) analysis &#8212; pyBPC  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="sphx-glr-download-link-note admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference internal" href="#sphx-glr-download-auto-examples-plot-bpc-py"><span class="std std-ref">Go to the end</span></a>
+to download the full example code</p>
+</div>
+<section class="sphx-glr-example-title" id="basis-profile-curve-bpc-analysis">
+<span id="ex-bpc"></span><span id="sphx-glr-auto-examples-plot-bpc-py"></span><h1>Basis Profile Curve (BPC) analysis<a class="headerlink" href="#basis-profile-curve-bpc-analysis" title="Permalink to this heading">¶</a></h1>
+<p>In this example, we will show how to use basis profile curve (BPC)
+analysis to quantify the shapes and strengths of connectivity from
+electrical stimulation sites to a recording site.</p>
+<p>To do: format citation  <a class="reference external" href="https://doi.org/10.1101/2021.01.24.428020">https://doi.org/10.1101/2021.01.24.428020</a></p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Authors: Alex Rockhill &lt;aprockhill@mailbox.org&gt;</span>
+<span class="c1">#          Dora Hermes</span>
+<span class="c1">#</span>
+<span class="c1"># License: BSD-3-Clause</span>
+
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">import</span> <span class="nn">openneuro</span>
+<span class="kn">import</span> <span class="nn">mne</span>
+<span class="kn">import</span> <span class="nn">mne_bids</span>
+
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">matplotlib.cm</span> <span class="k">as</span> <span class="nn">cm</span>
+<span class="kn">from</span> <span class="nn">sklearn.decomposition</span> <span class="kn">import</span> <span class="n">NMF</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">stats</span>
+</pre></div>
+</div>
+<p>First, download the dataset.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dataset</span> <span class="o">=</span> <span class="s1">&#39;ds003708&#39;</span>
+<span class="n">root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s1">&#39;..&#39;</span><span class="p">)</span> <span class="o">/</span> <span class="s1">&#39;..&#39;</span> <span class="o">/</span> <span class="n">dataset</span>
+<span class="c1"># openneuro.download(dataset=dataset, target_dir=root)</span>
+</pre></div>
+</div>
+<p>Load the data and plot channel positions and events.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">path</span> <span class="o">=</span> <span class="n">mne_bids</span><span class="o">.</span><span class="n">BIDSPath</span><span class="p">(</span>
+    <span class="n">subject</span><span class="o">=</span><span class="s1">&#39;01&#39;</span><span class="p">,</span> <span class="n">session</span><span class="o">=</span><span class="s1">&#39;ieeg01&#39;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s1">&#39;ccep&#39;</span><span class="p">,</span> <span class="n">run</span><span class="o">=</span><span class="s1">&#39;01&#39;</span><span class="p">,</span> <span class="n">root</span><span class="o">=</span><span class="n">root</span><span class="p">)</span>
+<span class="n">raw</span> <span class="o">=</span> <span class="n">mne_bids</span><span class="o">.</span><span class="n">read_raw_bids</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+
+<span class="n">trans</span> <span class="o">=</span> <span class="n">mne</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">Transform</span><span class="p">(</span><span class="n">fro</span><span class="o">=</span><span class="s1">&#39;head&#39;</span><span class="p">,</span> <span class="n">to</span><span class="o">=</span><span class="s1">&#39;mri&#39;</span><span class="p">,</span> <span class="n">trans</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">4</span><span class="p">))</span>  <span class="c1"># identity</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">mne</span><span class="o">.</span><span class="n">viz</span><span class="o">.</span><span class="n">plot_alignment</span><span class="p">(</span>
+    <span class="n">raw</span><span class="o">.</span><span class="n">info</span><span class="p">,</span> <span class="n">trans</span><span class="o">=</span><span class="n">trans</span><span class="p">,</span> <span class="n">subject</span><span class="o">=</span><span class="s1">&#39;fsaverage&#39;</span><span class="p">,</span> <span class="n">surfaces</span><span class="o">=</span><span class="s1">&#39;pial&#39;</span><span class="p">)</span>
+<span class="n">mne</span><span class="o">.</span><span class="n">viz</span><span class="o">.</span><span class="n">set_3d_view</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">azimuth</span><span class="o">=</span><span class="mi">190</span><span class="p">)</span>
+
+<span class="n">xy</span><span class="p">,</span> <span class="n">im</span> <span class="o">=</span> <span class="n">mne</span><span class="o">.</span><span class="n">viz</span><span class="o">.</span><span class="n">snapshot_brain_montage</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">raw</span><span class="o">.</span><span class="n">info</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">()</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">im</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">pos</span> <span class="ow">in</span> <span class="n">xy</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="k">if</span> <span class="n">pos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">pos</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># no NaN locations</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="o">*</span><span class="n">pos</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s1">&#39;center&#39;</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s1">&#39;center&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+
+<span class="n">events</span><span class="p">,</span> <span class="n">event_id</span> <span class="o">=</span> <span class="n">mne</span><span class="o">.</span><span class="n">events_from_annotations</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+<span class="n">mne</span><span class="o">.</span><span class="n">viz</span><span class="o">.</span><span class="n">plot_events</span><span class="p">(</span><span class="n">events</span><span class="p">,</span> <span class="n">raw</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s1">&#39;sfreq&#39;</span><span class="p">],</span> <span class="n">event_id</span><span class="o">=</span><span class="n">event_id</span><span class="p">,</span> <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../_images/sphx_glr_plot_bpc_001.png" srcset="../_images/sphx_glr_plot_bpc_001.png" alt="plot bpc" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_plot_bpc_002.png" srcset="../_images/sphx_glr_plot_bpc_002.png" alt="plot bpc" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Extracting parameters from ../../ds003708/sub-01/ses-ieeg01/ieeg/sub-01_ses-ieeg01_task-ccep_run-01_ieeg.vhdr...
+Setting channel info structure...
+Reading events from ../../ds003708/sub-01/ses-ieeg01/ieeg/sub-01_ses-ieeg01_task-ccep_run-01_events.tsv.
+Reading channel info from ../../ds003708/sub-01/ses-ieeg01/ieeg/sub-01_ses-ieeg01_task-ccep_run-01_channels.tsv.
+/home/alexrockhill/Downloads/bpc_jupyter/examples/plot_bpc.py:42: RuntimeWarning: MNI152NLin6Sym is not an MNE-Python coordinate frame for IEEG data and so will be set to &#39;unknown&#39;
+  raw = mne_bids.read_raw_bids(path)
+Reading electrode coords from ../../ds003708/sub-01/ses-ieeg01/ieeg/sub-01_ses-ieeg01_space-MNI152NLin6Sym_electrodes.tsv.
+/home/alexrockhill/Downloads/bpc_jupyter/examples/plot_bpc.py:42: RuntimeWarning: There are channels without locations (n/a) that are not marked as bad: [&#39;EKG&#39;]
+  raw = mne_bids.read_raw_bids(path)
+/home/alexrockhill/projects/mne-bids/mne_bids/dig.py:610: RuntimeWarning: Not setting position of 1 ecg channel found in montage:
+[&#39;EKG&#39;]
+Consider setting the channel types to be of EEG/sEEG/ECoG/DBS/fNIRS using inst.set_channel_types before calling inst.set_montage, or omit these channels when creating your montage.
+  raw.set_montage(montage, on_missing=&quot;warn&quot;)
+Using pyvistaqt 3d backend.
+
+/home/alexrockhill/Downloads/bpc_jupyter/examples/plot_bpc.py:45: RuntimeWarning: Got coordinate frame &quot;unknown&quot; for [&#39;LAS1&#39;, &#39;LAS2&#39;, &#39;LAS3&#39;, &#39;LAS4&#39;, &#39;LMS1&#39;, &#39;LMS2&#39;, &#39;LMS3&#39;, &#39;LMS4&#39;, &#39;LPS1&#39;, &#39;LPS2&#39;, &#39;LPS3&#39;, &#39;LPS4&#39;, &#39;LTG1&#39;, &#39;LTG2&#39;, &#39;LTG3&#39;, &#39;LTG4&#39;, &#39;LTG5&#39;, &#39;LTG6&#39;, &#39;LTG7&#39;, &#39;LTG8&#39;, &#39;LTG9&#39;, &#39;LTG10&#39;, &#39;LTG11&#39;, &#39;LTG12&#39;, &#39;LTG13&#39;, &#39;LTG14&#39;, &#39;LTG15&#39;, &#39;LTG16&#39;, &#39;LTG17&#39;, &#39;LTG18&#39;, &#39;LTG19&#39;, &#39;LTG20&#39;, &#39;LTG21&#39;, &#39;LTG22&#39;, &#39;LTG23&#39;, &#39;LTG24&#39;, &#39;LTG25&#39;, &#39;LTG26&#39;, &#39;LTG27&#39;, &#39;LTG28&#39;, &#39;LTG29&#39;, &#39;LTG30&#39;, &#39;LTG31&#39;, &#39;LTG32&#39;, &#39;LTG41&#39;, &#39;LTG42&#39;, &#39;LTG43&#39;, &#39;LTG44&#39;, &#39;LTG45&#39;, &#39;LTG46&#39;, &#39;LTG47&#39;, &#39;LTG48&#39;, &#39;LAG49&#39;, &#39;LAG50&#39;, &#39;LAG51&#39;, &#39;LAG52&#39;, &#39;LAG53&#39;, &#39;LAG54&#39;, &#39;LAG57&#39;, &#39;LAG58&#39;, &#39;LAG59&#39;, &#39;LAG60&#39;, &#39;LAG61&#39;, &#39;LAG62&#39;, &#39;LAD1&#39;, &#39;LAD2&#39;, &#39;LAD3&#39;, &#39;LAD4&#39;, &#39;LSD1&#39;, &#39;LSD2&#39;, &#39;LSD3&#39;, &#39;LSD4&#39;, &#39;LPD1&#39;, &#39;LPD2&#39;, &#39;LPD3&#39;, &#39;LPD4&#39;], assuming &quot;head&quot; coordinates.
+  fig = mne.viz.plot_alignment(
+Channel types:: ecog: 64, seeg: 12
+Used Annotations descriptions: [&#39;electrical_stimulation&#39;]
+
+&lt;Figure size 640x480 with 1 Axes&gt;
+</pre></div>
+</div>
+<p>Create epochs around stimulation, visualize data.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">contact</span> <span class="o">=</span> <span class="s1">&#39;LMS2&#39;</span>
+<span class="n">tmin</span><span class="p">,</span> <span class="n">tmax</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span>
+<span class="n">bl_tmin</span><span class="p">,</span> <span class="n">bl_tmax</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.05</span>
+
+<span class="c1"># try ``baseline=None`` for no baseline correction to play around</span>
+<span class="n">metadata</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">suffix</span><span class="o">=</span><span class="s1">&#39;events&#39;</span><span class="p">),</span> <span class="n">sep</span><span class="o">=</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">)</span>
+<span class="n">keep</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">trial_type</span> <span class="o">==</span> <span class="s1">&#39;electrical_stimulation&#39;</span>
+<span class="k">if</span> <span class="s1">&#39;status&#39;</span> <span class="ow">in</span> <span class="n">metadata</span><span class="p">:</span>
+    <span class="n">keep</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">logical_and</span><span class="p">(</span><span class="n">keep</span><span class="p">,</span> <span class="n">metadata</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s1">&#39;good&#39;</span><span class="p">)</span>
+<span class="n">metadata</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="n">keep</span><span class="p">]</span>
+<span class="n">epochs</span> <span class="o">=</span> <span class="n">mne</span><span class="o">.</span><span class="n">Epochs</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="n">events</span><span class="p">[</span><span class="n">keep</span><span class="p">],</span>
+                    <span class="n">tmin</span><span class="o">=</span><span class="n">tmin</span><span class="p">,</span> <span class="n">tmax</span><span class="o">=</span><span class="n">tmax</span><span class="p">,</span>
+                    <span class="n">baseline</span><span class="o">=</span><span class="p">(</span><span class="n">bl_tmin</span><span class="p">,</span> <span class="n">bl_tmax</span><span class="p">),</span> <span class="n">picks</span><span class="o">=</span><span class="p">[</span><span class="n">contact</span><span class="p">],</span>
+                    <span class="n">preload</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">epochs</span><span class="o">.</span><span class="n">metadata</span> <span class="o">=</span> <span class="n">metadata</span>  <span class="c1"># contains stimulation location information</span>
+
+<span class="c1"># unpack each pair separated by a hyphen, only use trials where</span>
+<span class="c1"># stimulation was delivered to channels other than the channel of</span>
+<span class="c1"># interest</span>
+<span class="n">epochs</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;site1&#39;</span><span class="p">],</span> <span class="n">epochs</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;site2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+    <span class="n">sites</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">sites</span> <span class="ow">in</span>
+    <span class="n">epochs</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">electrical_stimulation_site</span><span class="p">])</span><span class="o">.</span><span class="n">T</span>
+<span class="n">exclude</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">in1d</span><span class="p">(</span><span class="n">epochs</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">site1</span><span class="p">,</span> <span class="n">contact</span><span class="p">)</span> <span class="o">|</span> \
+    <span class="n">np</span><span class="o">.</span><span class="n">in1d</span><span class="p">(</span><span class="n">epochs</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">site2</span><span class="p">,</span> <span class="n">contact</span><span class="p">)</span>
+<span class="n">epochs</span> <span class="o">=</span> <span class="n">epochs</span><span class="p">[</span><span class="o">~</span><span class="n">exclude</span><span class="p">]</span>
+
+<span class="n">epochs</span><span class="o">.</span><span class="n">plot_image</span><span class="p">(</span><span class="n">picks</span><span class="o">=</span><span class="p">[</span><span class="n">contact</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;viridis&#39;</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=-</span><span class="mi">250</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">250</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_plot_bpc_003.png" srcset="../_images/sphx_glr_plot_bpc_003.png" alt="LMS2" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Not setting metadata
+391 matching events found
+Applying baseline correction (mode: mean)
+0 projection items activated
+Loading data for 391 events and 6145 original time points ...
+0 bad epochs dropped
+Adding metadata with 14 columns
+Not setting metadata
+386 matching events found
+No baseline correction applied
+0 projection items activated
+
+[&lt;Figure size 640x480 with 4 Axes&gt;]
+</pre></div>
+</div>
+<p>Calculate BPCs.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">bpc_tmin</span><span class="p">,</span> <span class="n">bpc_tmax</span> <span class="o">=</span> <span class="mf">0.015</span><span class="p">,</span> <span class="mi">1</span>
+
+<span class="n">stim_sites</span> <span class="o">=</span> <span class="n">epochs</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">electrical_stimulation_site</span>
+<span class="n">V</span> <span class="o">=</span> <span class="n">epochs</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="n">tmin</span><span class="o">=</span><span class="n">bpc_tmin</span><span class="p">,</span> <span class="n">tmax</span><span class="o">=</span><span class="n">bpc_tmax</span><span class="p">)[:,</span> <span class="mi">0</span><span class="p">]</span>  <span class="c1"># select only channel</span>
+<span class="n">times</span> <span class="o">=</span> <span class="n">epochs</span><span class="o">.</span><span class="n">times</span><span class="p">[(</span><span class="n">epochs</span><span class="o">.</span><span class="n">times</span> <span class="o">&gt;=</span> <span class="n">bpc_tmin</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">epochs</span><span class="o">.</span><span class="n">times</span> <span class="o">&lt;=</span> <span class="n">bpc_tmax</span><span class="p">)]</span>
+<span class="n">V0</span> <span class="o">=</span> <span class="n">V</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">V</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">]</span>  <span class="c1"># L2 norm each trial</span>
+<span class="n">P</span> <span class="o">=</span> <span class="n">V0</span> <span class="o">@</span> <span class="n">V</span><span class="o">.</span><span class="n">T</span>  <span class="c1"># calculate internal projections</span>
+
+<span class="n">pairs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">stim_sites</span><span class="p">)))</span>
+<span class="n">tmat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">pairs</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">pairs</span><span class="p">)))</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">pair1</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pairs</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">pair2</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pairs</span><span class="p">):</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">P</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ix_</span><span class="p">(</span><span class="n">stim_sites</span> <span class="o">==</span> <span class="n">pair1</span><span class="p">,</span> <span class="n">stim_sites</span> <span class="o">==</span> <span class="n">pair2</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="n">j</span><span class="p">:</span>  <span class="c1"># subset without diagonal</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">b</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">tril_indices</span><span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">k</span><span class="o">=-</span><span class="mi">1</span><span class="p">)],</span>
+                                <span class="n">b</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">triu_indices</span><span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">)]])</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">b</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+        <span class="n">tmat</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">))</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">ddof</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">()</span>
+<span class="n">img</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">tmat</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">tmat</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xticklabels</span><span class="p">(</span><span class="n">pairs</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">6</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Stimulation Pair&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">tmat</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_yticklabels</span><span class="p">(</span><span class="n">pairs</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">6</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Stimulation Pair&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Significance Matrix $\Xi$&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">15</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">bottom</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+
+<span class="n">t0</span> <span class="o">=</span> <span class="n">tmat</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">t0</span><span class="p">[</span><span class="n">t0</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">t0</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">t0</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">t0</span> <span class="o">/=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">t0</span><span class="p">))</span>
+
+<span class="n">cluster_dim</span> <span class="o">=</span> <span class="mi">9</span>
+<span class="n">n_reruns</span> <span class="o">=</span> <span class="mi">20</span>
+<span class="n">tol</span> <span class="o">=</span> <span class="mf">1e-5</span>
+<span class="n">random_state</span> <span class="o">=</span> <span class="mi">11</span>
+<span class="k">for</span> <span class="n">n_components</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">cluster_dim</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+    <span class="n">this_error</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_reruns</span><span class="p">):</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">NMF</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="n">n_components</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="s1">&#39;random&#39;</span><span class="p">,</span> <span class="n">solver</span><span class="o">=</span><span class="s1">&#39;mu&#39;</span><span class="p">,</span>
+                    <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">,</span> <span class="n">max_iter</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">t0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">this_error</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">model</span><span class="o">.</span><span class="n">reconstruction_err_</span> <span class="o">&lt;</span> <span class="n">this_error</span><span class="p">:</span>
+            <span class="n">this_error</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">reconstruction_err_</span>
+            <span class="n">W</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">t0</span><span class="p">)</span>
+            <span class="n">H</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">components_</span>
+    <span class="n">H</span> <span class="o">/=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">]</span>
+    <span class="n">nmf_penalty</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">triu</span><span class="p">(</span><span class="n">H</span> <span class="o">@</span> <span class="n">H</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Inner dimension: </span><span class="si">{</span><span class="n">n_components</span><span class="si">}</span><span class="s1">, off diagonal score: </span><span class="si">{</span><span class="n">nmf_penalty</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">nmf_penalty</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">break</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_plot_bpc_004.png" srcset="../_images/sphx_glr_plot_bpc_004.png" alt="Significance Matrix $\Xi$" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Inner dimension: 9, off diagonal score: 13.586655375330714
+Inner dimension: 8, off diagonal score: 13.830209145444451
+Inner dimension: 7, off diagonal score: 6.879772475317331
+Inner dimension: 6, off diagonal score: 4.469056055412816
+Inner dimension: 5, off diagonal score: 4.30738637781777
+Inner dimension: 4, off diagonal score: 2.299036540778825
+Inner dimension: 3, off diagonal score: 0.6818650369085922
+</pre></div>
+</div>
+<p>find stimulation trials for every BPC</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">kpca</span><span class="p">(</span><span class="n">X</span><span class="p">):</span>
+    <span class="n">F</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">svd</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>  <span class="c1"># Compute the eigenvalues and right eigenvectors</span>
+    <span class="n">ES</span> <span class="o">=</span> <span class="n">X</span> <span class="o">@</span> <span class="n">F</span>  <span class="c1"># kernel trick</span>
+    <span class="c1"># divide through to obtain unit-normalized eigenvectors</span>
+    <span class="n">E</span> <span class="o">=</span> <span class="n">ES</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">))</span> <span class="o">@</span> <span class="n">S</span><span class="p">[</span><span class="kc">None</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">E</span>
+
+
+<span class="c1"># find significant pairs per BPC; must be &gt; threshold and greater than other BPCs</span>
+<span class="n">bpc_pairs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">pairs</span><span class="p">)))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>  <span class="c1"># index of bpc</span>
+<span class="n">Bs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n_components</span><span class="p">,</span> <span class="n">V</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>  <span class="c1"># n_BPCs x n_times</span>
+<span class="k">for</span> <span class="n">bpc_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_components</span><span class="p">):</span>  <span class="c1"># loop over BPCs</span>
+    <span class="n">bpc_pair_idxs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">((</span><span class="n">H</span><span class="p">[</span><span class="n">bpc_idx</span><span class="p">]</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span> <span class="o">&amp;</span>
+                             <span class="p">(</span><span class="n">H</span><span class="p">[</span><span class="n">bpc_idx</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pairs</span><span class="p">)))))[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">bpc_pairs</span><span class="p">[</span><span class="n">bpc_pair_idxs</span><span class="p">]</span> <span class="o">=</span> <span class="n">bpc_idx</span>
+    <span class="n">bpc_trials</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">stim_sites</span> <span class="o">==</span> <span class="n">pairs</span><span class="p">[</span><span class="n">idx</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
+                                 <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">bpc_pair_idxs</span><span class="p">])</span>
+    <span class="n">Bs</span><span class="p">[</span><span class="n">bpc_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">kpca</span><span class="p">(</span><span class="n">V</span><span class="p">[</span><span class="n">bpc_trials</span><span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="p">)[:,</span> <span class="mi">0</span><span class="p">]</span>  <span class="c1"># basis vector is 1st PC</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">Bs</span><span class="p">[</span><span class="n">bpc_idx</span><span class="p">]</span> <span class="o">@</span> <span class="n">V</span><span class="p">[</span><span class="n">bpc_trials</span><span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">Bs</span><span class="p">[</span><span class="n">bpc_idx</span><span class="p">]</span> <span class="o">*=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># sign flip</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">bpc_idx</span><span class="p">,</span> <span class="n">bpc_pair_idxs</span><span class="p">)</span>
+<span class="n">excluded_pairs</span> <span class="o">=</span> <span class="n">pairs</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">bpc_pairs</span><span class="p">)]</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>0 [ 9 16 17 18 21 36 37]
+1 [ 0  1  2  3 11 12 19 29 38]
+2 [ 4  5  6  7  8 13 14 15 23 24 32 34 35]
+</pre></div>
+</div>
+<p>plot BPCs</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">colors</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">tab10</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">bpc</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">Bs</span><span class="p">):</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">times</span><span class="p">,</span> <span class="n">bpc</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="n">i</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Time from stimulation (s)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Normalized weight of BPCs&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Calculated BPCs&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">15</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_plot_bpc_005.png" srcset="../_images/sphx_glr_plot_bpc_005.png" alt="Calculated BPCs" class = "sphx-glr-single-img"/><p>curve statistics</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">alphas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">stim_sites</span><span class="p">)))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+<span class="n">epsilon2s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">stim_sites</span><span class="p">)))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+<span class="n">V2s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">stim_sites</span><span class="p">)))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+<span class="n">errxprojs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">pairs</span><span class="p">)))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+<span class="n">p_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">pairs</span><span class="p">)))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+<span class="n">plotweights</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">pairs</span><span class="p">)))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+<span class="k">for</span> <span class="n">bpc_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_components</span><span class="p">):</span>  <span class="c1"># loop over BPCs</span>
+    <span class="c1"># alpha coefficient weights for basis curve into V</span>
+    <span class="n">bpc_alphas</span> <span class="o">=</span> <span class="n">Bs</span><span class="p">[</span><span class="n">bpc_idx</span><span class="p">]</span> <span class="o">@</span> <span class="n">V</span><span class="o">.</span><span class="n">T</span>
+    <span class="c1"># residual epsilon (error timeseries) for basis bb after alpha*B coefficient fit</span>
+    <span class="n">bpc_epsilon2</span> <span class="o">=</span> <span class="n">V</span> <span class="o">-</span> <span class="p">(</span><span class="n">Bs</span><span class="p">[</span><span class="n">bpc_idx</span><span class="p">][:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">@</span> <span class="n">bpc_alphas</span><span class="p">[</span><span class="kc">None</span><span class="p">])</span><span class="o">.</span><span class="n">T</span>
+    <span class="n">errxproj</span> <span class="o">=</span> <span class="n">bpc_epsilon2</span>  <span class="o">@</span> <span class="n">bpc_epsilon2</span><span class="o">.</span><span class="n">T</span>  <span class="c1"># calculate all projections of error</span>
+    <span class="n">V_selfproj</span> <span class="o">=</span> <span class="n">V</span> <span class="o">@</span> <span class="n">V</span><span class="o">.</span><span class="n">T</span>  <span class="c1"># power in each trial</span>
+
+    <span class="c1"># cycle through pair types represented by this basis curve</span>
+    <span class="k">for</span> <span class="n">pair_idx</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">bpc_pairs</span> <span class="o">==</span> <span class="n">bpc_idx</span><span class="p">)[</span><span class="mi">0</span><span class="p">]:</span>
+        <span class="n">trials</span> <span class="o">=</span> <span class="n">stim_sites</span> <span class="o">==</span> <span class="n">pairs</span><span class="p">[</span><span class="n">pair_idx</span><span class="p">]</span>
+        <span class="c1"># alpha coefficient weights for basis curve bb into V</span>
+        <span class="n">alphas</span><span class="p">[</span><span class="n">trials</span><span class="p">]</span> <span class="o">=</span> <span class="n">bpc_alphas</span><span class="p">[</span><span class="n">trials</span><span class="p">]</span>
+        <span class="c1"># self-submatrix of error projections</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">errxproj</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ix_</span><span class="p">(</span><span class="n">trials</span><span class="p">,</span> <span class="n">trials</span><span class="p">)]</span>
+        <span class="n">epsilon2s</span><span class="p">[</span><span class="n">trials</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+        <span class="c1"># sum-squared individual trials</span>
+        <span class="n">V2s</span><span class="p">[</span><span class="n">trials</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">V_selfproj</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ix_</span><span class="p">(</span><span class="n">trials</span><span class="p">,</span> <span class="n">trials</span><span class="p">)])</span>
+
+        <span class="c1"># gather all off-diagonal elements from self-submatrix</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">a</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">tril_indices</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">k</span><span class="o">=-</span><span class="mi">1</span><span class="p">)],</span>
+                            <span class="n">a</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">triu_indices</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">)]])</span>
+
+        <span class="c1"># systematic residual structure within a stim pair group for a given basis will be</span>
+        <span class="c1"># given by set of native normalized internal cross-projections</span>
+        <span class="n">errxproj</span><span class="p">[</span><span class="n">pair_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">))</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">ddof</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">plotweights</span><span class="p">[</span><span class="n">pair_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">alphas</span><span class="p">[</span><span class="n">trials</span><span class="p">]</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">epsilon2s</span><span class="p">[</span><span class="n">trials</span><span class="p">]))</span>
+        <span class="n">T_stat</span><span class="p">,</span> <span class="n">p_val</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">ttest_1samp</span><span class="p">((</span><span class="n">alphas</span><span class="p">[</span><span class="n">trials</span><span class="p">]</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">epsilon2s</span><span class="p">[</span><span class="n">trials</span><span class="p">])),</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">p_vals</span><span class="p">[</span><span class="n">pair_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">p_val</span>
+</pre></div>
+</div>
+<p>Plot the final results.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">colors</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">tab10</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">()</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">im</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pairs</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">bpc_pairs</span><span class="p">[</span><span class="n">i</span><span class="p">]):</span>
+        <span class="k">continue</span>
+    <span class="n">ch0</span><span class="p">,</span> <span class="n">ch1</span> <span class="o">=</span> <span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">)</span>
+    <span class="n">pos</span> <span class="o">=</span> <span class="p">(</span><span class="n">xy</span><span class="p">[</span><span class="n">ch0</span><span class="p">]</span> <span class="o">+</span> <span class="n">xy</span><span class="p">[</span><span class="n">ch1</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="k">if</span> <span class="n">pos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">pos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">im</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">or</span> <span class="n">pos</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">pos</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">im</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="k">continue</span>
+    <span class="n">color</span> <span class="o">=</span> <span class="n">colors</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">bpc_pairs</span><span class="p">[</span><span class="n">i</span><span class="p">])]</span>
+    <span class="n">size</span> <span class="o">=</span> <span class="n">plotweights</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="mi">200</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="o">*</span><span class="n">pos</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">color</span><span class="p">[:</span><span class="mi">3</span><span class="p">],</span> <span class="n">s</span><span class="o">=</span><span class="p">[</span><span class="n">size</span><span class="p">],</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.75</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_plot_bpc_006.png" srcset="../_images/sphx_glr_plot_bpc_006.png" alt="plot bpc" class = "sphx-glr-single-img"/><p>Put it all together into a function.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="sd">&#39;&#39;&#39; Work in progress</span>
+<span class="sd">def bpcs(V, stim_sites, cluster_dim=10, n_reruns=20, tol=1e-5,</span>
+<span class="sd">         random_state=99, verbose=True):</span>
+<span class="sd">    &quot;&quot;&quot;Compute basis profile curves of an evoked response.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    V : np.ndarray (n_epochs, n_samples)</span>
+<span class="sd">        The voltage time course for the channel of interest.</span>
+<span class="sd">    stim_sites : np.ndarray (n_epochs)</span>
+<span class="sd">        The stimulation sites for each epoch.</span>
+<span class="sd">    cluster_dim : int</span>
+<span class="sd">        The maximum dimension of the clusters.</span>
+<span class="sd">    n_reruns : int</span>
+<span class="sd">        The number of reruns of non-negative matrix factorization</span>
+<span class="sd">        to ensure convergence.</span>
+<span class="sd">    tol : float</span>
+<span class="sd">        The convergence tolerance threshold.</span>
+<span class="sd">    random_state : int</span>
+<span class="sd">        Reproducibility seed.</span>
+<span class="sd">    verbose : bool</span>
+<span class="sd">        Whether to print function status updates.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tmat : np.ndarray (n_pairs, n_pairs)</span>
+<span class="sd">        The projection matrix.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    V0 = V / np.linalg.norm(V, axis=1)[:, None]  # L2 norm each trial</span>
+<span class="sd">    P = V0 @ V.T  # calculate internal projections</span>
+
+<span class="sd">    pairs = np.array(sorted(np.unique(stim_sites)))</span>
+<span class="sd">    tmat = np.zeros((len(pairs), len(pairs)))</span>
+<span class="sd">    for i, pair1 in enumerate(pairs):</span>
+<span class="sd">        for j, pair2 in enumerate(pairs):</span>
+<span class="sd">            b = P[np.ix_(stim_sites == pair1, stim_sites == pair2)]</span>
+<span class="sd">            if i == j:  # subset without diagonal</span>
+<span class="sd">                b = np.concatenate([b[np.tril_indices(b.shape[0], k=-1)],</span>
+<span class="sd">                                    b[np.triu_indices(b.shape[0], k=1)]])</span>
+<span class="sd">            b = b.ravel()</span>
+<span class="sd">            tmat[i, j] = np.mean(b) * np.sqrt(len(b)) / np.std(b, ddof=1)</span>
+
+<span class="sd">    t0 = tmat.copy()</span>
+<span class="sd">    t0[t0 &lt; 0] = 0</span>
+<span class="sd">    t0 /= (np.max(t0))</span>
+
+<span class="sd">    for n_components in range(cluster_dim, 1, -1):</span>
+<span class="sd">        this_error = None</span>
+<span class="sd">        for k in range(n_reruns):</span>
+<span class="sd">            model = NMF(n_components=n_components, init=&#39;random&#39;, solver=&#39;mu&#39;,</span>
+<span class="sd">                        tol=tol, max_iter=10000, random_state=random_state).fit(t0)</span>
+<span class="sd">            if this_error is None or model.reconstruction_err_ &lt; this_error:</span>
+<span class="sd">                this_error = model.reconstruction_err_</span>
+<span class="sd">                W = model.transform(t0)</span>
+<span class="sd">                H = model.components_</span>
+<span class="sd">        H /= np.linalg.norm(H, axis=1)[:, None]</span>
+<span class="sd">        nmf_penalty = np.triu(H @ H.T, k=1).sum()</span>
+<span class="sd">        print(f&#39;Inner dimension: {n_components}, off diagonal score: {nmf_penalty}&#39;)</span>
+<span class="sd">        if nmf_penalty &lt; 1:</span>
+<span class="sd">            break</span>
+
+<span class="sd">    # find significant pairs per BPC; must be &gt; threshold and greater than other BPCs</span>
+<span class="sd">    bpc_pairs = np.zeros((len(pairs))) * np.nan  # index of bpc</span>
+<span class="sd">    Bs = np.zeros((H.shape[0], V.shape[1]))  # n_BPCs x n_times</span>
+<span class="sd">    for bpc_idx in range(H.shape[0]):</span>
+<span class="sd">        bpc_pair_idxs = np.where((H[bpc_idx] == np.max(H, axis=0)) &amp;</span>
+<span class="sd">                                 (H[bpc_idx] &gt; 1 / (2 * np.sqrt(len(pairs)))))[0]</span>
+<span class="sd">        bpc_pairs[bpc_pair_idxs] = bpc_idx</span>
+<span class="sd">        bpc_trials = np.concatenate([np.where(stim_sites == pairs[idx])[0]</span>
+<span class="sd">                                     for idx in bpc_pair_idxs])</span>
+<span class="sd">        Bs[bpc_idx] = kpca(V[bpc_trials].T)[:, 0]  # basis vector is 1st PC</span>
+<span class="sd">        if np.mean(Bs[bpc_idx] @ V[bpc_trials].T) &lt; 0:</span>
+<span class="sd">            Bs[bpc_idx] *= -1  # sign flip</span>
+<span class="sd">    excluded_pairs = pairs[np.isnan(bpc_pairs)]</span>
+
+<span class="sd">    # curve statistics</span>
+<span class="sd">    alphas = np.zeros((len()))</span>
+<span class="sd">    for bpc_idx, bpc_pairs in enumerate(pairs_per_bpc):  # cycle through basis curves</span>
+<span class="sd">        # alpha coefficient weights for basis curve into V</span>
+<span class="sd">        bpc_alphas = Bs[bpc_idx] @ V.T</span>
+<span class="sd">        # residual epsilon (error timeseries) for basis bb after alpha*B coefficient fit</span>
+<span class="sd">        ep = V - Bs[bpc_idx][None].T @ alphas[None]</span>
+<span class="sd">        errxproj = ep.T  @ ep  # calculate all projections of error</span>
+<span class="sd">        V_selfproj = V.T @ V  # power in each trial</span>
+
+<span class="sd">        # cycle through pair types represented by this basis curve</span>
+<span class="sd">        for pair_idx in range():</span>
+<span class="sd">            ind = (B_struct.pairs[bb])[n]</span>
+<span class="sd">            tmp_inds = pair_types[&#39;indices&#39;][ind]  # indices for this pair type</span>
+<span class="sd">            # alpha coefficient weights for basis curve bb into V</span>
+<span class="sd">            (B_struct.alphas[bb]).append(al[tmp_inds])</span>
+<span class="sd">            # self-submatrix of error projections</span>
+<span class="sd">            a = errxproj[np.ix_(tmp_inds, tmp_inds)]</span>
+<span class="sd">            (B_struct.ep2[bb]).append((np.diag(a)).T)  # sum-squared error</span>
+<span class="sd">            # sum-squared individual trials</span>
+<span class="sd">            (B_struct.V2[bb]).append(</span>
+<span class="sd">                np.diag(V_selfproj[np.ix_(tmp_inds, tmp_inds)]).T)</span>
+
+<span class="sd">            # gather all off-diagonal elements from self-submatrix</span>
+<span class="sd">            b = []</span>
+<span class="sd">            # for q=1:(size(a,2)-1), b=[b a(q,(q+1):end)]; end</span>
+<span class="sd">            for q in range(a.shape[1]-1):</span>
+<span class="sd">                b.extend(a[q, q+1:])</span>
+<span class="sd">            # for q=2:(size(a,2)), b=[b a(q,1:(q-1))]; end</span>
+<span class="sd">            for q in range(1, a.shape[1]):</span>
+<span class="sd">                b.extend(a[q, :q-1])</span>
+
+<span class="sd">            # systematic residual structure within a stim pair group for a given basis will be</span>
+<span class="sd">            # given by set of native normalized internal cross-projections</span>
+<span class="sd">            B_struct.errxproj[bb] = b</span>
+
+<span class="sd">    # projection weights</span>
+<span class="sd">    p_vals = np.zeros(())</span>
+<span class="sd">    plotweights = np.zeros(())</span>
+<span class="sd">    for q in range(Bs.shape[0]):  # cycle through basis curves</span>
+<span class="sd">        # cycle through pair types represented by this basis curve</span>
+<span class="sd">        for n in range(B_struct.pairs[q].shape[0]):</span>
+<span class="sd">            curr_alphas = B_struct.alphas[q][n]</span>
+<span class="sd">            curr_ep2_5 = (B_struct.ep2[q][n])**0.5</span>
+<span class="sd">            # alphas normalized by error magnitude</span>
+<span class="sd">            plotweights[q].append(np.mean(curr_alphas / curr_ep2_5))</span>
+
+<span class="sd">            # significance alphas normalized by error magnitude</span>
+<span class="sd">            t, pVal = stats.ttest_1samp((curr_alphas / curr_ep2_5), 0)</span>
+<span class="sd">            (B_struct.p[q]).append(pVal)</span>
+
+<span class="sd">    return tmat, Bs, excluded_pairs</span>
+<span class="sd">&#39;&#39;&#39;</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>&#39; Work in progress\ndef bpcs(V, stim_sites, cluster_dim=10, n_reruns=20, tol=1e-5,\n         random_state=99, verbose=True):\n    &quot;&quot;&quot;Compute basis profile curves of an evoked response.\n\n    Parameters\n    ----------\n    V : np.ndarray (n_epochs, n_samples)\n        The voltage time course for the channel of interest.\n    stim_sites : np.ndarray (n_epochs)\n        The stimulation sites for each epoch.\n    cluster_dim : int\n        The maximum dimension of the clusters.\n    n_reruns : int\n        The number of reruns of non-negative matrix factorization\n        to ensure convergence.\n    tol : float\n        The convergence tolerance threshold.\n    random_state : int\n        Reproducibility seed.\n    verbose : bool\n        Whether to print function status updates.\n\n    Returns\n    -------\n    tmat : np.ndarray (n_pairs, n_pairs)\n        The projection matrix.\n    &quot;&quot;&quot;\n    V0 = V / np.linalg.norm(V, axis=1)[:, None]  # L2 norm each trial\n    P = V0 @ V.T  # calculate internal projections\n\n    pairs = np.array(sorted(np.unique(stim_sites)))\n    tmat = np.zeros((len(pairs), len(pairs)))\n    for i, pair1 in enumerate(pairs):\n        for j, pair2 in enumerate(pairs):\n            b = P[np.ix_(stim_sites == pair1, stim_sites == pair2)]\n            if i == j:  # subset without diagonal\n                b = np.concatenate([b[np.tril_indices(b.shape[0], k=-1)],\n                                    b[np.triu_indices(b.shape[0], k=1)]])\n            b = b.ravel()\n            tmat[i, j] = np.mean(b) * np.sqrt(len(b)) / np.std(b, ddof=1)\n\n    t0 = tmat.copy()\n    t0[t0 &lt; 0] = 0\n    t0 /= (np.max(t0))\n\n    for n_components in range(cluster_dim, 1, -1):\n        this_error = None\n        for k in range(n_reruns):\n            model = NMF(n_components=n_components, init=\&#39;random\&#39;, solver=\&#39;mu\&#39;,\n                        tol=tol, max_iter=10000, random_state=random_state).fit(t0)\n            if this_error is None or model.reconstruction_err_ &lt; this_error:\n                this_error = model.reconstruction_err_\n                W = model.transform(t0)\n                H = model.components_\n        H /= np.linalg.norm(H, axis=1)[:, None]\n        nmf_penalty = np.triu(H @ H.T, k=1).sum()\n        print(f\&#39;Inner dimension: {n_components}, off diagonal score: {nmf_penalty}\&#39;)\n        if nmf_penalty &lt; 1:\n            break\n\n    # find significant pairs per BPC; must be &gt; threshold and greater than other BPCs\n    bpc_pairs = np.zeros((len(pairs))) * np.nan  # index of bpc\n    Bs = np.zeros((H.shape[0], V.shape[1]))  # n_BPCs x n_times\n    for bpc_idx in range(H.shape[0]):\n        bpc_pair_idxs = np.where((H[bpc_idx] == np.max(H, axis=0)) &amp;\n                                 (H[bpc_idx] &gt; 1 / (2 * np.sqrt(len(pairs)))))[0]\n        bpc_pairs[bpc_pair_idxs] = bpc_idx\n        bpc_trials = np.concatenate([np.where(stim_sites == pairs[idx])[0]\n                                     for idx in bpc_pair_idxs])\n        Bs[bpc_idx] = kpca(V[bpc_trials].T)[:, 0]  # basis vector is 1st PC\n        if np.mean(Bs[bpc_idx] @ V[bpc_trials].T) &lt; 0:\n            Bs[bpc_idx] *= -1  # sign flip\n    excluded_pairs = pairs[np.isnan(bpc_pairs)]\n\n    # curve statistics\n    alphas = np.zeros((len()))\n    for bpc_idx, bpc_pairs in enumerate(pairs_per_bpc):  # cycle through basis curves\n        # alpha coefficient weights for basis curve into V\n        bpc_alphas = Bs[bpc_idx] @ V.T\n        # residual epsilon (error timeseries) for basis bb after alpha*B coefficient fit\n        ep = V - Bs[bpc_idx][None].T @ alphas[None]\n        errxproj = ep.T  @ ep  # calculate all projections of error\n        V_selfproj = V.T @ V  # power in each trial\n\n        # cycle through pair types represented by this basis curve\n        for pair_idx in range():\n            ind = (B_struct.pairs[bb])[n]\n            tmp_inds = pair_types[\&#39;indices\&#39;][ind]  # indices for this pair type\n            # alpha coefficient weights for basis curve bb into V\n            (B_struct.alphas[bb]).append(al[tmp_inds])\n            # self-submatrix of error projections\n            a = errxproj[np.ix_(tmp_inds, tmp_inds)]\n            (B_struct.ep2[bb]).append((np.diag(a)).T)  # sum-squared error\n            # sum-squared individual trials\n            (B_struct.V2[bb]).append(\n                np.diag(V_selfproj[np.ix_(tmp_inds, tmp_inds)]).T)\n\n            # gather all off-diagonal elements from self-submatrix\n            b = []\n            # for q=1:(size(a,2)-1), b=[b a(q,(q+1):end)]; end\n            for q in range(a.shape[1]-1):\n                b.extend(a[q, q+1:])\n            # for q=2:(size(a,2)), b=[b a(q,1:(q-1))]; end\n            for q in range(1, a.shape[1]):\n                b.extend(a[q, :q-1])\n\n            # systematic residual structure within a stim pair group for a given basis will be\n            # given by set of native normalized internal cross-projections\n            B_struct.errxproj[bb] = b\n\n    # projection weights\n    p_vals = np.zeros(())\n    plotweights = np.zeros(())\n    for q in range(Bs.shape[0]):  # cycle through basis curves\n        # cycle through pair types represented by this basis curve\n        for n in range(B_struct.pairs[q].shape[0]):\n            curr_alphas = B_struct.alphas[q][n]\n            curr_ep2_5 = (B_struct.ep2[q][n])**0.5\n            # alphas normalized by error magnitude\n            plotweights[q].append(np.mean(curr_alphas / curr_ep2_5))\n\n            # significance alphas normalized by error magnitude\n            t, pVal = stats.ttest_1samp((curr_alphas / curr_ep2_5), 0)\n            (B_struct.p[q]).append(pVal)\n\n    return tmat, Bs, excluded_pairs\n&#39;
+</pre></div>
+</div>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  14.937 seconds)</p>
+<div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-auto-examples-plot-bpc-py">
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/4f09a43a7d237c0198017e8982f239ce/plot_bpc.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">plot_bpc.py</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/b48d7f01d66c5bb3c22bf56e66105a35/plot_bpc.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">plot_bpc.ipynb</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">pyBPC</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, Alex Rockhill, Dora Hermes.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 6.1.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="../_sources/auto_examples/plot_bpc.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
